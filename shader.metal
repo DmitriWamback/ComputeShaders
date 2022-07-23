@@ -73,19 +73,47 @@ float noise(float x, float y, float z) {
                                         gradient(p[BB + 1], x - 1, y - 1, z - 1))));
 }
 
-float noise_layer(float3 coordinate, int octaves, float freq, float ampl) {
+float noise_layer(float3 coordinate, int octaves, float freq, float ampl, float t) {
     
-    float frequency = 0.005;
+    float frequency = 1.0;
     float amplitude = 1.0;
     float result = 0;
     
     for (int i = 0; i < octaves; i++) {
-        result += noise(coordinate.x * frequency, coordinate.y * frequency, coordinate.z) * amplitude;
+        result += ((noise(coordinate.x * frequency + t, coordinate.y * frequency + t, coordinate.z * frequency + t) + 1) / 2) * amplitude;
         frequency *= freq;
         amplitude *= ampl;
     }
     
-    return result;
+    return result > 0.9 ? 1.0 : 0.6;
+}
+
+
+float4x4 eulerRotation(float3 rotation) {
+    
+    float xrad = rotation.x * 3.14159265 / 180;
+    float yrad = rotation.y * 3.14159265 / 180;
+    float zrad = rotation.z * 3.14159265 / 180;
+    
+    float4x4 xrot = float4x4(
+                    float4(cos(xrad), -sin(xrad), 0, 0),
+                    float4(sin(xrad),  cos(xrad), 0, 0),
+                    float4(0,          0,         1, 0),
+                    float4(0,          0,         0, 1));
+    
+    float4x4 yrot = float4x4(
+                    float4( cos(yrad),  0, sin(yrad), 0),
+                    float4( 0,          1, 0,         0),
+                    float4(-sin(yrad),  0, cos(yrad), 0),
+                    float4(0,           0,         0, 1));
+    
+    float4x4 zrot = float4x4(
+                    float4(1,  0,          0,         0),
+                    float4(0,  cos(zrad), -sin(zrad), 0),
+                    float4(0,  sin(zrad),  cos(zrad), 0),
+                    float4(0,          0,         0,  1));
+    
+    return xrot * yrot * zrot;
 }
 
 
@@ -142,20 +170,29 @@ kernel void compute(texture2d<half, access::read_write> texture [[texture(0)]],
         
         float3 hit1 = rayOrigin + rayDirection * t1;
         float3 hit2 = rayOrigin + rayDirection * t2;
+        float3 surface_position_hit2 = (eulerRotation(float3(12, uniforms.time * 100, 0)) * float4(hit2, 1.0)).xyz;
         
-        float3 lightPosition = float3(sin(uniforms.time * 10) * 10, -10, cos(uniforms.time * 10) * 10);
+        float3 lightPosition = float3(0, -3, 10);
         float3 direction = normalize(lightPosition - hit2);
         float diff = max(dot(hit2, direction), 0.0);
-        float3 color = float3(0.5, 0.0, 0.8);
+        float3 color = float3(0.5, 0.7, 0.8);
         float3 ambient = color * 0.05;
         
         float3 viewDirection = normalize(float3(0) - hit2);
         float3 reflection = reflect(-direction, hit2);
         float spec = pow(max(dot(viewDirection, reflection), 0.0), 32);
         
-        color = color * (diff + float3(spec)) + ambient;
+        float noiseValue = noise_layer(surface_position_hit2, 20, 2, 0.5, uniforms.time * 2);
         
-        texture.write(half4(half3(color), 1.0), index);
+        // albedo
+        color = (color * (diff + float3(spec)) + ambient) * noiseValue;
+        
+        // hdr + gamma correction
+        float exposure = 1.0;
+        float3 mapped = float3(1.0) - exp(-color * exposure);
+        mapped = pow(mapped, float3(1.0 / 1.5));
+        
+        texture.write(half4(half3(mapped), 1.0), index);
     }
     else texture.write(half4(0.0, 0.0, 0.0, 1.0), index);
 }
