@@ -45,9 +45,12 @@ class ViewController: NSViewController {
         kernel.createComputeKernel(library: library, device: metal_device, commandQueue: queue)
         
         test = Renderable()
-        test.sendData(vertices: [-0.5, -0.5, 0.0,
-                                  0.5, -0.5, 0.0,
-                                  0.0,  0.5, 0.0], uniforms: ViewController.uniforms)
+        test.sendData(vertices: [-1.0, -1.0, 0.0,
+                                  1.0, -1.0, 0.0,
+                                  1.0,  1.0, 0.0,
+                                  1.0,  1.0, 0.0,
+                                 -1.0,  1.0, 0.0,
+                                 -1.0, -1.0, 0.0], uniforms: ViewController.uniforms)
     }
 }
 
@@ -62,6 +65,9 @@ extension ViewController: MTKViewDelegate {
         guard let drawable = view.currentDrawable else {
             return
         }
+        
+        ViewController.uniforms.time += 0.001
+        kernel.use(drawable: drawable)
         
         let renderPassDescriptor = MTLRenderPassDescriptor()
         renderPassDescriptor.colorAttachments[0].texture = drawable.texture
@@ -79,12 +85,6 @@ extension ViewController: MTKViewDelegate {
         renderEncoder.endEncoding()
         commandBuffer.present(drawable)
         commandBuffer.commit()
-        
-        guard let drawable = view.currentDrawable else {
-            return
-        }
-        
-        kernel.use(drawable: drawable)
     }
 }
 
@@ -118,7 +118,7 @@ class Renderable {
         renderEncoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
         
         uniforms.time += 0.1
-        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
     }
 }
 
@@ -155,7 +155,7 @@ class ComputeKernel {
         textureDescriptor.width = Int(ViewController.uniforms.window_size.x)
         textureDescriptor.height = Int(ViewController.uniforms.window_size.y)
         textureDescriptor.depth = 1
-        texture = device?.makeTexture(descriptor: textureDescriptor)
+        texture = device!.makeTexture(descriptor: textureDescriptor)!
     }
     
     func use(drawable: CAMetalDrawable?) {
@@ -165,7 +165,9 @@ class ComputeKernel {
         computeEncoder.setComputePipelineState(computePipeline)
         computeEncoder.setTexture(texture, index: 0)
         computeEncoder.setBytes(&ViewController.uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
-        computeEncoder.dispatchThreads(MTLSize(width: 100, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+        computeEncoder.dispatchThreads(MTLSize(width: Int(ViewController.uniforms.window_size.x),
+                                               height: Int(ViewController.uniforms.window_size.y), depth: 1),
+                                               threadsPerThreadgroup: MTLSize(width: 10, height: 10, depth: 1))
         computeEncoder.endEncoding()
         
         commandBuffer.present(drawable!)
