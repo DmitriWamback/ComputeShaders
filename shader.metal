@@ -75,17 +75,17 @@ float noise(float x, float y, float z) {
 
 float noise_layer(float3 coordinate, int octaves, float freq, float ampl) {
     
-    float frequency = 0.01;
+    float frequency = 0.005;
     float amplitude = 1.0;
     float result = 0;
     
     for (int i = 0; i < octaves; i++) {
-        result += (1 - abs(noise(coordinate.x * frequency, coordinate.y * frequency, coordinate.z))) * amplitude;
+        result += noise(coordinate.x * frequency, coordinate.y * frequency, coordinate.z) * amplitude;
         frequency *= freq;
         amplitude *= ampl;
     }
     
-    return result - 1;
+    return result;
 }
 
 
@@ -107,6 +107,7 @@ struct vertex_out {
     float time;
 };
 
+
 vertex vertex_out vertexMain(const device vertex_in* vArray [[buffer(0)]],
                              constant Uniforms &uniforms [[buffer(1)]],
                              unsigned int vertexid [[vertex_id]]) {
@@ -125,14 +126,45 @@ kernel void compute(texture2d<half, access::read_write> texture [[texture(0)]],
                     constant Uniforms &uniforms [[buffer(1)]],
                     uint2 index [[thread_position_in_grid]]) {
     
-    float3 coordinate = float3(float2(index), 10 + uniforms.time * 10);
-    float noiseValue = noise_layer(coordinate, 2, 1.6, 0.5);
-    texture.write(half4(half3(noiseValue), 1.0), index);
+    float2 uv = float2((index.x / uniforms.window_size.x) - 0.5, index.y / uniforms.window_size.y - 0.5);
+    float3 rayOrigin = float3(0.0, 0.0, -2.0);
+    float3 rayDirection = float3(uv.x, uv.y, -1.0);
+    float radius = 0.5;
+    float a = dot(rayDirection, rayDirection);
+    float b = 2 * dot(rayOrigin, rayDirection);
+    float c = dot(rayOrigin, rayOrigin) - pow(radius, 2);
+    float discriminant = pow(b, 2) - (4 * a * c);
+    
+    if (discriminant >= 0) {
+        
+        float t1 = (-b + sqrt(discriminant)) / (2 * a);
+        float t2 = (-b - sqrt(discriminant)) / (2 * a);
+        
+        float3 hit1 = rayOrigin + rayDirection * t1;
+        float3 hit2 = rayOrigin + rayDirection * t2;
+        
+        float3 lightPosition = float3(sin(uniforms.time * 10) * 10, -10, cos(uniforms.time * 10) * 10);
+        float3 direction = normalize(lightPosition - hit2);
+        float diff = max(dot(hit2, direction), 0.0);
+        float3 color = float3(0.5, 0.0, 0.8);
+        float3 ambient = color * 0.05;
+        
+        float3 viewDirection = normalize(float3(0) - hit2);
+        float3 reflection = reflect(-direction, hit2);
+        float spec = pow(max(dot(viewDirection, reflection), 0.0), 32);
+        
+        color = color * (diff + float3(spec)) + ambient;
+        
+        texture.write(half4(half3(color), 1.0), index);
+    }
+    else texture.write(half4(0.0, 0.0, 0.0, 1.0), index);
 }
 
 fragment float4 fragmentMain(vertex_out i [[stage_in]], texture2d<float> texture [[texture(0)]]) {
     
     constexpr sampler sample(coord::normalized, address::clamp_to_zero, filter::nearest);
-    return texture.sample(sample, i.uv);
+    float4 fragc = texture.sample(sample, i.uv);
+    
+    return fragc;
     //return float4(1.0 * (((sin(i.time) + 1) / 2) + 1) / 2, 0.0, 0.0, 1.0);
 }
