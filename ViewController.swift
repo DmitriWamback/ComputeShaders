@@ -18,7 +18,7 @@ class ViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        metalView = MTKView(frame: NSRect(x: 0, y: 0, width: 1200, height: 800))
+        metalView = MTKView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1000))
         
         metal_device = MTLCreateSystemDefaultDevice()
         queue = metal_device.makeCommandQueue()
@@ -61,7 +61,7 @@ extension ViewController: MTKViewDelegate {
     }
     
     func draw(in view: MTKView) {
-        
+                
         guard let drawable = view.currentDrawable else {
             return
         }
