@@ -54,7 +54,7 @@ kernel void compute(texture2d<half, access::read_write> texture [[texture(0)]],
         float3 reflection = reflect(-direction, hit2);
         float spec = pow(max(dot(viewDirection, reflection), 0.0), 32);
         
-        float noiseValue = noise_layer(surface_position_hit2, 40, 2, 0.6, 0 + uniforms.time);
+        float noiseValue = noise_layer(surface_position_hit2, 40, 2, 0.6, 0 + uniforms.noise_time);
         
         // albedo
         color = (color * (diff + float3(spec)) + (diff + float3(spec)) * float3(0.7, 0.9, 0.6) * 2 + ambient) * noiseValue;
