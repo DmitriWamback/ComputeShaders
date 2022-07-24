@@ -10,6 +10,7 @@ class ViewController: NSViewController {
     var queue:            MTLCommandQueue!
     var metalView:        MTKView!
     var compute_pipeline: MTLComputePipelineState!
+    var monitor: Any?
     
     var test:             Renderable!
     static var uniforms:  Uniforms!
@@ -18,7 +19,8 @@ class ViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        metalView = MTKView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1000))
+        metalView = MTKView(frame: NSRect(x: 0, y: 0, width: 1300, height: 1300))
+        preferredContentSize = metalView.frame.size
         
         metal_device = MTLCreateSystemDefaultDevice()
         queue = metal_device.makeCommandQueue()
@@ -39,7 +41,19 @@ class ViewController: NSViewController {
         self.view.addSubview(metalView)
         self.view.frame.size = metalView.frame.size
         
-        ViewController.uniforms = Uniforms(color: SIMD3<Float>(1.0, 0.0, 0.5), window_size: SIMD2<Float>(Float(self.view.frame.width), Float(self.view.frame.height)), time: 0)
+        ViewController.uniforms = Uniforms(color: SIMD3<Float>(1.0, 0.0, 0.5),
+                                           window_size: SIMD2<Float>(Float(self.view.frame.width), Float(self.view.frame.height)),
+                                           time: 0,
+                                           rotation: 0)
+        
+        self.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
+            if self.keyDownEvent(with: $0) {
+                return nil
+            }
+            else {
+                return $0
+            }
+        }
         
         kernel = ComputeKernel()
         kernel.createComputeKernel(library: library, device: metal_device, commandQueue: queue)
@@ -86,6 +100,19 @@ extension ViewController: MTKViewDelegate {
         commandBuffer.present(drawable)
         commandBuffer.commit()
     }
+    
+    func keyDownEvent(with event: NSEvent) -> Bool {
+        
+        print(event.keyCode)
+        if event.keyCode == 0 {
+            ViewController.uniforms.rotation -= 4
+        }
+        if event.keyCode == 2 {
+            ViewController.uniforms.rotation += 4
+        }
+        
+        return true
+    }
 }
 
 
@@ -95,6 +122,7 @@ struct Uniforms {
     var color: SIMD3<Float>
     var window_size: SIMD2<Float>
     var time: Float
+    var rotation: Float
 }
 
 class Renderable {
