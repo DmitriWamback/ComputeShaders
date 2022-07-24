@@ -85,7 +85,7 @@ float noise_layer(float3 coordinate, int octaves, float freq, float ampl, float 
         amplitude *= ampl;
     }
     
-    return result > 0.9 ? 1.0 : 0.6;
+    return result > 1.1 ? result * 2 : 0.6 * result;
 }
 
 
@@ -122,6 +122,7 @@ struct Uniforms {
     float3 col;
     float2 window_size;
     float time;
+    float rotation;
 };
 
 struct vertex_in {
@@ -155,7 +156,8 @@ kernel void compute(texture2d<half, access::read_write> texture [[texture(0)]],
                     uint2 index [[thread_position_in_grid]]) {
     
     float2 uv = float2((index.x / uniforms.window_size.x) - 0.5, index.y / uniforms.window_size.y - 0.5);
-    float3 rayOrigin = float3(0.0, 0.0, -2.0);
+    float3 position = float3(0.0, 0.0, 0.0);
+    float3 rayOrigin = float3(0.0, 0.0, -2.0) + position;
     float3 rayDirection = float3(uv.x, uv.y, -1.0);
     float radius = 0.5;
     float a = dot(rayDirection, rayDirection);
@@ -170,27 +172,29 @@ kernel void compute(texture2d<half, access::read_write> texture [[texture(0)]],
         
         float3 hit1 = rayOrigin + rayDirection * t1;
         float3 hit2 = rayOrigin + rayDirection * t2;
-        float3 surface_position_hit2 = (eulerRotation(float3(12, uniforms.time * 100, 0)) * float4(hit2, 1.0)).xyz;
+        float3 normal2 = normalize(hit2 - position);
         
-        float3 lightPosition = float3(0, -3, 10);
-        float3 direction = normalize(lightPosition - hit2);
+        float3 surface_position_hit2 = (eulerRotation(float3(12, uniforms.rotation, 0)) * float4(hit2, 1.0)).xyz;
+        
+        float3 lightPosition = float3(0, 3, 10);
+        float3 direction = normalize(lightPosition - normal2);
         float diff = max(dot(hit2, direction), 0.0);
         float3 color = float3(0.5, 0.7, 0.8);
         float3 ambient = color * 0.05;
         
-        float3 viewDirection = normalize(float3(0) - hit2);
+        float3 viewDirection = normalize(float3(0) - normal2);
         float3 reflection = reflect(-direction, hit2);
         float spec = pow(max(dot(viewDirection, reflection), 0.0), 32);
         
-        float noiseValue = noise_layer(surface_position_hit2, 20, 2, 0.5, uniforms.time * 2);
+        float noiseValue = noise_layer(surface_position_hit2, 40, 2, 0.6, 355 + uniforms.time);
         
         // albedo
-        color = (color * (diff + float3(spec)) + ambient) * noiseValue;
+        color = (color * (diff + float3(spec)) + (diff + float3(spec)) * float3(0.7, 0.9, 0.6) * 2 + ambient) * noiseValue;
         
         // hdr + gamma correction
         float exposure = 1.0;
         float3 mapped = float3(1.0) - exp(-color * exposure);
-        mapped = pow(mapped, float3(1.0 / 1.5));
+        mapped = pow(mapped, float3(1.0 / 1.1));
         
         texture.write(half4(half3(mapped), 1.0), index);
     }
@@ -200,7 +204,7 @@ kernel void compute(texture2d<half, access::read_write> texture [[texture(0)]],
 fragment float4 fragmentMain(vertex_out i [[stage_in]], texture2d<float> texture [[texture(0)]]) {
     
     constexpr sampler sample(coord::normalized, address::clamp_to_zero, filter::nearest);
-    float4 fragc = texture.sample(sample, i.uv);
+    float4 fragc = texture.sample(sample, float2(i.uv.x, 1 - i.uv.y));
     
     return fragc;
     //return float4(1.0 * (((sin(i.time) + 1) / 2) + 1) / 2, 0.0, 0.0, 1.0);
