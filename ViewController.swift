@@ -11,6 +11,8 @@ class ViewController: NSViewController {
     var metalView:        MTKView!
     var compute_pipeline: MTLComputePipelineState!
     var monitor: Any?
+    var mousePosition:    SIMD2<Double>!
+    var cameraRotation:   SIMD2<Double>!
     
     var test:             Renderable!
     static var uniforms:  Uniforms!
@@ -18,6 +20,9 @@ class ViewController: NSViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        mousePosition = SIMD2<Double>(0, 0)
+        cameraRotation = SIMD2<Double>(0, 0)
         
         metalView = MTKView(frame: NSRect(x: 0, y: 0, width: 1300, height: 1300))
         preferredContentSize = metalView.frame.size
@@ -43,8 +48,10 @@ class ViewController: NSViewController {
         
         ViewController.uniforms = Uniforms(color: SIMD3<Float>(1.0, 0.0, 0.5),
                                            window_size: SIMD2<Float>(Float(self.view.frame.width), Float(self.view.frame.height)),
+                                           camera_rotation: SIMD3<Float>(0.0, 0.0, -1.0),
                                            time: 0,
-                                           rotation: 0)
+                                           rotation: 0,
+                                           noise_time: 0)
         
         self.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
             if self.keyDownEvent(with: $0) {
@@ -53,6 +60,12 @@ class ViewController: NSViewController {
             else {
                 return $0
             }
+        }
+        self.monitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) {
+            
+            self.mouseMoveEvent(with: $0)
+            
+            return nil
         }
         
         kernel = ComputeKernel()
@@ -81,7 +94,6 @@ extension ViewController: MTKViewDelegate {
         }
         
         ViewController.uniforms.time += 0.001
-        kernel.use(drawable: drawable)
         
         let renderPassDescriptor = MTLRenderPassDescriptor()
         renderPassDescriptor.colorAttachments[0].texture = drawable.texture
@@ -99,6 +111,8 @@ extension ViewController: MTKViewDelegate {
         renderEncoder.endEncoding()
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        
+        kernel.use(drawable: drawable)
     }
     
     func keyDownEvent(with event: NSEvent) -> Bool {
@@ -106,12 +120,42 @@ extension ViewController: MTKViewDelegate {
         print(event.keyCode)
         if event.keyCode == 0 {
             ViewController.uniforms.rotation -= 4
+            print(ViewController.uniforms.rotation)
         }
         if event.keyCode == 2 {
             ViewController.uniforms.rotation += 4
         }
         
+        // q
+        if event.keyCode == 12 {
+            ViewController.uniforms.noise_time -= 0.001
+        }
+        // e
+        if event.keyCode == 14 {
+            ViewController.uniforms.noise_time += 0.001
+        }
+        
         return true
+    }
+    
+    func mouseMoveEvent(with event: NSEvent) {
+        
+    }
+    
+    override func rightMouseDragged(with event: NSEvent) {
+        let x = (Double(event.locationInWindow.x) - mousePosition.x)
+        let y = (Double(event.locationInWindow.y) - mousePosition.y)
+        
+        cameraRotation.x -= x * 0.25
+        cameraRotation.y += y * 0.25
+        
+        ViewController.uniforms.camera_rotation = SIMD3<Float>(
+            Float(cos(cameraRotation.y * 3.14159265 / 180) * cos(cameraRotation.x * 3.14159265 / 180)),
+            Float(sin(cameraRotation.y * 3.14159265 / 180)),
+            Float(cos(cameraRotation.y * 3.14159265 / 180) * sin(cameraRotation.x * 3.14159265 / 180))
+        )
+        
+        mousePosition = SIMD2<Double>(x, y)
     }
 }
 
@@ -121,8 +165,10 @@ extension ViewController: MTKViewDelegate {
 struct Uniforms {
     var color: SIMD3<Float>
     var window_size: SIMD2<Float>
+    var camera_rotation: SIMD3<Float>
     var time: Float
     var rotation: Float
+    var noise_time: Float
 }
 
 class Renderable {
