@@ -4,8 +4,10 @@
 struct Uniforms {
     float3 col;
     float2 window_size;
+    float3 camera_rotation;
     float time;
     float rotation;
+    float noise_time;
 };
 
 struct vertex_in {
