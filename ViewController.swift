@@ -124,32 +124,13 @@ extension ViewController: MTKViewDelegate {
     
     func keyDownEvent(with event: NSEvent) -> Bool {
         
-        if event.keyCode == 0 {
-            ViewController.uniforms.rotation -= 4
-            print(ViewController.uniforms.rotation)
-        }
-        if event.keyCode == 2 {
-            ViewController.uniforms.rotation += 4
-        }
-        
-        // w
-        if event.keyCode == 13 {
-            ViewController.uniforms.camera_position += ViewController.uniforms.camera_rotation * 0.02
-        }
-        
-        // s
-        if event.keyCode == 1 {
-            ViewController.uniforms.camera_position -= ViewController.uniforms.camera_rotation * 0.02
-        }
-        
-        // q
-        if event.keyCode == 12 {
-            ViewController.uniforms.noise_time -= 0.001
-        }
-        // e
-        if event.keyCode == 14 {
-            ViewController.uniforms.noise_time += 0.001
-        }
+        // Keys: A, D, W, S, Q, E (in order)
+        if event.keyCode == 0 { ViewController.uniforms.rotation -= 4 }
+        if event.keyCode == 2 { ViewController.uniforms.rotation += 4 }
+        if event.keyCode == 13 { ViewController.uniforms.camera_position += ViewController.uniforms.camera_rotation * 0.02 }
+        if event.keyCode == 1  { ViewController.uniforms.camera_position -= ViewController.uniforms.camera_rotation * 0.02 }
+        if event.keyCode == 12 { ViewController.uniforms.noise_time -= 0.001 }
+        if event.keyCode == 14 { ViewController.uniforms.noise_time += 0.001 }
         
         return true
     }
