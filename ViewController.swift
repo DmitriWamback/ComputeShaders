@@ -48,10 +48,12 @@ class ViewController: NSViewController {
         
         ViewController.uniforms = Uniforms(color: SIMD3<Float>(1.0, 0.0, 0.5),
                                            window_size: SIMD2<Float>(Float(self.view.frame.width), Float(self.view.frame.height)),
-                                           camera_rotation: SIMD3<Float>(0.0, 0.0, -1.0),
+                                           camera_rotation: SIMD3<Float>( 1.0, 0.0, 0.0),
+                                           camera_position: SIMD3<Float>(-2.0, 0.0, 0.0),
                                            time: 0,
                                            rotation: 0,
-                                           noise_time: 0)
+                                           noise_time: 0,
+                                           light_position: 0)
         
         self.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
             if self.keyDownEvent(with: $0) {
@@ -63,8 +65,7 @@ class ViewController: NSViewController {
         }
         self.monitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) {
             
-            self.mouseMoveEvent(with: $0)
-            
+            var position = self.mouseMoveEvent(with: $0)
             return nil
         }
         
@@ -115,15 +116,30 @@ extension ViewController: MTKViewDelegate {
         kernel.use(drawable: drawable)
     }
     
+    func mouseMoveEvent(with event: NSEvent) -> Bool {
+        
+        mousePosition = SIMD2<Double>(event.locationInWindow.x, event.locationInWindow.y)
+        return true
+    }
+    
     func keyDownEvent(with event: NSEvent) -> Bool {
         
-        print(event.keyCode)
         if event.keyCode == 0 {
             ViewController.uniforms.rotation -= 4
             print(ViewController.uniforms.rotation)
         }
         if event.keyCode == 2 {
             ViewController.uniforms.rotation += 4
+        }
+        
+        // w
+        if event.keyCode == 13 {
+            ViewController.uniforms.camera_position += ViewController.uniforms.camera_rotation * 0.02
+        }
+        
+        // s
+        if event.keyCode == 1 {
+            ViewController.uniforms.camera_position -= ViewController.uniforms.camera_rotation * 0.02
         }
         
         // q
@@ -138,24 +154,16 @@ extension ViewController: MTKViewDelegate {
         return true
     }
     
-    func mouseMoveEvent(with event: NSEvent) {
-        
-    }
-    
     override func rightMouseDragged(with event: NSEvent) {
-        let x = (Double(event.locationInWindow.x) - mousePosition.x)
-        let y = (Double(event.locationInWindow.y) - mousePosition.y)
         
-        cameraRotation.x -= x * 0.25
-        cameraRotation.y += y * 0.25
+        cameraRotation.x += event.deltaX * 0.05
+        cameraRotation.y += event.deltaY * 0.05
         
         ViewController.uniforms.camera_rotation = SIMD3<Float>(
             Float(cos(cameraRotation.y * 3.14159265 / 180) * cos(cameraRotation.x * 3.14159265 / 180)),
             Float(sin(cameraRotation.y * 3.14159265 / 180)),
             Float(cos(cameraRotation.y * 3.14159265 / 180) * sin(cameraRotation.x * 3.14159265 / 180))
         )
-        
-        mousePosition = SIMD2<Double>(x, y)
     }
 }
 
@@ -166,9 +174,11 @@ struct Uniforms {
     var color: SIMD3<Float>
     var window_size: SIMD2<Float>
     var camera_rotation: SIMD3<Float>
+    var camera_position: SIMD3<Float>
     var time: Float
     var rotation: Float
     var noise_time: Float
+    var light_position: Float
 }
 
 class Renderable {
