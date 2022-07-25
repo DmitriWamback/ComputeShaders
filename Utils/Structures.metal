@@ -5,9 +5,11 @@ struct Uniforms {
     float3 col;
     float2 window_size;
     float3 camera_rotation;
+    float3 camera_position;
     float time;
     float rotation;
     float noise_time;
+    float light_position;
 };
 
 struct vertex_in {
